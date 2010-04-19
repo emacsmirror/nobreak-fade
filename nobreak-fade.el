@@ -3,7 +3,7 @@
 ;; Copyright 2009, 2010 Kevin Ryde
 
 ;; Author: Kevin Ryde <user42@zip.com.au>
-;; Version: 3
+;; Version: 4
 ;; Keywords: convenience
 ;; URL: http://user42.tuxfamily.org/nobreak-fade/index.html
 
@@ -51,8 +51,71 @@
 ;; Version 2 - custom-option for nobreak-fade-single-letter-p too
 ;; Version 3 - nobreak-fade prefix for all funcs
 ;;           - new nobreak-fade-emacs-M-x-p
+;; Version 4 - new nobreak-fade-add
 
 ;;; Code:
+
+;;;###autoload
+(defun nobreak-fade-add (pred &optional local)
+  "Add PRED to `fill-nobreak-predicate'.
+If PRED is already in `fill-nobreak-predicate' then do nothing.
+If LOCAL is non-nil then add it buffer-local.
+
+This is a handy way to cope with different
+`fill-nobreak-predicate' in different versions of Emacs.  In
+Emacs 22 up it's simply
+
+    (add-hook 'fill-nobreak-predicate PRED nil LOCAL)
+
+If you always use 22 and up then you may as well write that
+directly, or use customize.
+
+In Emacs 21 `nobreak-fade-add' manipulates a single-function
+`fill-nobreak-predicate' value, and in XEmacs 21 it does
+nothing.
+
+The new PRED is always prepended to any existing
+`fill-nobreak-predicate' checks.  The order checks are made
+normally doesn't matter."
+
+  ;; The flavour of `fill-nobreak-predicate' is locked down at compile-time.
+  ;; Is there any merit in allowing for it added later in xemacs?
+  ;;
+  (cond ((eval-when-compile
+           (eq 'hook (get 'fill-nobreak-predicate 'custom-type)))
+         ;; emacs22 up, defcustom hook
+         (add-hook 'fill-nobreak-predicate pred nil local))
+
+        ((eval-when-compile (not (boundp 'fill-nobreak-predicate)))
+         ;; xemacs21, no such variable
+         )
+
+        (t
+         ;; emacs21, single predicate function
+         (if local (make-local-variable 'fill-nobreak-predicate))
+         (cond ((not fill-nobreak-predicate)
+                ;; no value yet, store
+                (setq fill-nobreak-predicate pred))
+               ((eq pred fill-nobreak-predicate)
+                ;; already equal, do nothing
+                )
+               ((and (eq   'lambda (car-safe fill-nobreak-predicate))
+                     (null (nth 1 fill-nobreak-predicate))
+                     (eq   'or (car-safe (nth 2 fill-nobreak-predicate)))
+                     (null (nthcdr 3 fill-nobreak-predicate)))
+                ;; lambda of `or'
+                (unless (member (list pred)
+                                (cdr (nth 2 fill-nobreak-predicate)))
+                  (setq fill-nobreak-predicate
+                        `(lambda () (or ,(list pred)
+                                        ,@(cdr (nth 2 fill-nobreak-predicate)))))))
+               (t ;; existing value, add to it
+                (set 'fill-nobreak-predicate
+                     `(lambda ()
+                        (or ,(list pred)
+                            ,(list fill-nobreak-predicate)))))))))
+
+;;-----------------------------------------------------------------------------
 
 ;;;###autoload
 (defun nobreak-fade-single-letter-p ()
