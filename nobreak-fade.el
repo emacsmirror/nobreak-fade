@@ -3,7 +3,7 @@
 ;; Copyright 2009, 2010 Kevin Ryde
 
 ;; Author: Kevin Ryde <user42@zip.com.au>
-;; Version: 4
+;; Version: 5
 ;; Keywords: convenience
 ;; URL: http://user42.tuxfamily.org/nobreak-fade/index.html
 
@@ -22,8 +22,13 @@
  
 ;;; Commentary:
 
-;; This is a few "nobreak" functions for `fill-nobreak-predicate'.
+;; This is some "nobreak" functions for `fill-nobreak-predicate'.
 ;; See each docstring for details.
+
+;;; Emacsen:
+
+;; Designed for Emacs 21 and up.  Does nothing in XEmacs 21 as it doesn't
+;; have a nobreak.
 
 ;;; Install:
 
@@ -33,17 +38,15 @@
 ;;     (autoload 'nobreak-fade-single-letter-p "nobreak-fade")
 ;;     (add-hook 'fill-nobreak-predicate 'nobreak-fade-single-letter-p)
 ;;
-;; or in Emacs 20 and 21 an equivalent setq or lambda (since
-;; `fill-nobreak-predicate' is not a hook until Emacs 22).
+;; For Emacs 20 and 21 try `nobreak-fade-add' below which copes with
+;; `fill-nobreak-predicate' being a plain variable in those versions,
+;;
+;;     (require 'nobreak-fade)
+;;     (nobreak-fade-add 'nobreak-fade-single-letter-p)
 ;;
 ;; There's autoload cookies for the functions if you know how to use
 ;; `update-file-autoloads' and friends, after which just add-hook or
 ;; customize.
-
-;;; Emacsen:
-
-;; Designed for Emacs 21 and up.  Does nothing in XEmacs 21 as it doesn't
-;; have a nobreak.
 
 ;;; History:
 
@@ -52,34 +55,37 @@
 ;; Version 3 - nobreak-fade prefix for all funcs
 ;;           - new nobreak-fade-emacs-M-x-p
 ;; Version 4 - new nobreak-fade-add
+;; Version 5 - new nobreak-fade-emacs-info-link-p
 
 ;;; Code:
+
+(defvar help-xref-info-regexp) ;; help.el or help-mode.el
 
 ;;;###autoload
 (defun nobreak-fade-add (pred &optional local)
   "Add PRED to `fill-nobreak-predicate'.
 If PRED is already in `fill-nobreak-predicate' then do nothing.
-If LOCAL is non-nil then add it buffer-local.
+If LOCAL is non-nil then add buffer-local.
 
-This is a handy way to cope with different
-`fill-nobreak-predicate' in different versions of Emacs.  In
-Emacs 22 up it's simply
+This is a handy way to cope with `fill-nobreak-predicate' being a
+single function in Emacs 21 and earlier.  For Emacs 22 it's a
+hook and this function is simply
 
     (add-hook 'fill-nobreak-predicate PRED nil LOCAL)
 
 If you always use 22 and up then you may as well write that
 directly, or use customize.
 
-In Emacs 21 `nobreak-fade-add' manipulates a single-function
-`fill-nobreak-predicate' value, and in XEmacs 21 it does
-nothing.
+In Emacs 21 this function manipulates a single lambda form in
+`fill-nobreak-predicate'.  And in XEmacs 21 it does nothing as
+there's no such variable.
 
 The new PRED is always prepended to any existing
 `fill-nobreak-predicate' checks.  The order checks are made
 normally doesn't matter."
 
   ;; The flavour of `fill-nobreak-predicate' is locked down at compile-time.
-  ;; Is there any merit in allowing for it added later in xemacs?
+  ;; Would there be merit allowing for it as an add-on in xemacs?
   ;;
   (cond ((eval-when-compile
            (eq 'hook (get 'fill-nobreak-predicate 'custom-type)))
@@ -134,14 +140,15 @@ sentence,
     I'.                       <--- no break before \"I\"
 
 The idea is that it's easier on the eye not to have a small word
-dangling, especially at the start of a sentence.
+dangling at the start or end of a sentence, especially at the
+start.
 
 A single punctuation character can be present too, such as a
 quotation mark, comma, or bracket.  More than one is not made a
 nobreak as the visual effect isn't as bad.
 
-See `fill-single-word-nobreak-p' (new in Emacs 23) for nobreak of
-any first or last word, not just single letter ones."
+See `fill-single-word-nobreak-p' (new in Emacs 23) for a nobreak
+of any first or last word, not just single letter ones."
 
   ;; punct \\s. and also parens \\s( and \\s)
   ;; pattern then "( letter punct | punct ? letter )"
@@ -184,11 +191,12 @@ It keeps an M-x on the same line as the command name that follows.
        | no break here
 
 This is meant to be easier on the eye than an M-x dangling at the
-end of a line, and help make it clear the command name is indeed
-a command name.
+end of a line, and can help make it clear the command name is
+indeed a command name.
 
-A quoted `M-x', or an M-x at the end of sentence etc is not
-affected, only if followed by a word or symbol.
+A quoted `M-x' without a command name, or an M-x at the end of
+sentence etc is not affected, only if followed by a word or
+symbol.
 
 This is Emacs specific but should be rare otherwise and so should
 do no harm if enabled globally.  Having it in all modes is good
@@ -212,12 +220,12 @@ like
        ^
        | no break here
 
-This is only for visual effect.  The help display system
-recognises a URL like this perfectly well with a newline.
+This is only for visual effect.  The help system recognises a URL
+link like this perfectly well with or without a newline.
 
 This nobreak is specific to Emacs docstrings but a URL and
-backquote should be rare in other text and should do no harm if
-enabled globally."
+backquote should be rare in other text and so should do no harm
+if enabled globally."
 
   (and (>= (- (point) 4) (point-min))
        (save-excursion
@@ -225,7 +233,48 @@ enabled globally."
          (let ((case-fold-search nil))
            (looking-at "\\bURL `\\S.")))))
 
+;;;###autoload
+(defun nobreak-fade-emacs-info-link-p ()
+  "Don't break within an Emacs docstring info link.
+This function is designed for use in `fill-nobreak-predicate'.
+It keeps the node name part of an info link on one line,
 
+    See Info node `(elisp)Documentation Tips'
+                                       ^
+                         no break here |
+
+Prior to Emacs 23.2 if there's a newline within the node name
+then pressing Ret to follow it only takes the name up to the
+newline.  This is fixed in Emacs 23.2 but avoiding a newline
+helps earlier versions.
+
+The \"Info node\" part introducing the link can have newlines,
+the problem is only in the node name.
+
+This nobreak is specific to Emacs docstrings but an Info node
+form will be rare in other text and so this nobreak should do no
+harm if enabled globally."
+
+  ;; emacs20,21 help-xref-info-regexp is in help.el and is pre-loaded.
+  ;; No (require 'help) since emacs20 help.el lacks a `provide'.
+  ;;
+  ;; emacs22 up help-xref-info-regexp is in help-model.el which must be
+  ;; required.
+  ;;
+  ;; xemacs21 doesn't have help-xref-info-regexp (and there's no
+  ;; help-mode.el), so will get an error, but don't worry about that as
+  ;; there's no fill-nobreak-predicate at all
+  ;;
+  (unless (boundp 'help-xref-info-regexp)
+    (require 'help-mode))
+
+  (eval-and-compile ;; quieten byte compiler call to looking-at
+    (require 'thingatpt))
+
+  (and (thing-at-point-looking-at help-xref-info-regexp)
+       (progn
+         (save-excursion
+           (search-backward "`" (match-beginning 0) t)))))
 
 ;;;###autoload
 (custom-add-option 'fill-nobreak-predicate 'nobreak-fade-single-letter-p)
@@ -233,6 +282,10 @@ enabled globally."
 (custom-add-option 'fill-nobreak-predicate 'nobreak-fade-emacs-M-x-p)
 ;;;###autoload
 (custom-add-option 'fill-nobreak-predicate 'nobreak-fade-emacs-url-p)
+;;;###autoload
+(custom-add-option 'fill-nobreak-predicate 'nobreak-fade-emacs-info-link-p)
+
+;; LocalWords: nobreak docstring docstrings Ret
 
 (provide 'nobreak-fade)
 
