@@ -3,7 +3,7 @@
 ;; Copyright 2009, 2010 Kevin Ryde
 
 ;; Author: Kevin Ryde <user42@zip.com.au>
-;; Version: 5
+;; Version: 6
 ;; Keywords: convenience
 ;; URL: http://user42.tuxfamily.org/nobreak-fade/index.html
 
@@ -56,10 +56,53 @@
 ;;           - new nobreak-fade-emacs-M-x-p
 ;; Version 4 - new nobreak-fade-add
 ;; Version 5 - new nobreak-fade-emacs-info-link-p
+;; Version 6 - interactive fun for nobreak-fade-add
 
 ;;; Code:
 
 (defvar help-xref-info-regexp) ;; help.el or help-mode.el
+
+(defun nobreak-fade-completing-read (symbol-list require-match)
+  "Read a nobreak function name from the user in the minibuffer.
+This is an internal part of nobreak-fade.el.
+
+SYMBOL-LIST is a list of function symbols.  If REQUIRE-MATCH is
+nil then the return can be any function symbol.  If REQUIRE-MATCH
+is non-nil then it's one of SYMBOL-LIST."
+
+  (let ((default (symbol-at-point))
+        (table   (mapcar (lambda (symbol)
+                           (let (desc)
+                             ;; first line of docstring for
+                             ;; completing-help.el or icicles
+                             (and (fboundp symbol)
+                                  (setq desc (documentation symbol))
+                                  (string-match "\n" desc)
+                                  (setq desc (substring desc 0
+                                                        (match-beginning 0))))
+                             ;; Crib note: completion table keys must be
+                             ;; strings for emacs21, and completing-help.el
+                             ;; 3.13 `completing-help-alist-p' only
+                             ;; recognises strings too
+                             (cons (symbol-name symbol) desc)))
+                         symbol-list)))
+    (unless (member default symbol-list)
+      (setq default nil))
+
+    (let* ((str (completing-read
+                 (if default
+                     (format "Nobreak function (default %s): " default)
+                   "Nobreak function name: ")
+                 table
+                 nil           ;; predicate
+                 require-match
+                 nil           ;; initial input
+                 'nobreak-fade-history
+                 default))
+           (ret (intern-soft str)))
+      (unless (fboundp ret)
+        (error "Not a function: %s" str))
+      ret)))
 
 ;;;###autoload
 (defun nobreak-fade-add (pred &optional local)
@@ -83,6 +126,11 @@ there's no such variable.
 The new PRED is always prepended to any existing
 `fill-nobreak-predicate' checks.  The order checks are made
 normally doesn't matter."
+
+  (interactive
+   (list (nobreak-fade-completing-read
+          (get 'fill-nobreak-predicate 'custom-options)
+          nil)))
 
   ;; The flavour of `fill-nobreak-predicate' is locked down at compile-time.
   ;; Would there be merit allowing for it as an add-on in xemacs?
