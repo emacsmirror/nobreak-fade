@@ -1,10 +1,10 @@
 ;;; nobreak-fade.el --- some functions for `fill-nobreak-predicate'
 
-;; Copyright 2009, 2010 Kevin Ryde
+;; Copyright 2009, 2010, 2011 Kevin Ryde
 
 ;; Author: Kevin Ryde <user42@zip.com.au>
-;; Version: 6
-;; Keywords: convenience
+;; Version: 7
+;; Keywords: convenience, filling
 ;; URL: http://user42.tuxfamily.org/nobreak-fade/index.html
 
 ;; nobreak-fade.el is free software; you can redistribute it
@@ -27,7 +27,7 @@
 
 ;;; Emacsen:
 
-;; Designed for Emacs 21 and up.  Does nothing in XEmacs 21 as it doesn't
+;; Designed for Emacs 20 and up.  Does nothing in XEmacs 21 as it doesn't
 ;; have a nobreak.
 
 ;;; Install:
@@ -57,6 +57,7 @@
 ;; Version 4 - new nobreak-fade-add
 ;; Version 5 - new nobreak-fade-emacs-info-link-p
 ;; Version 6 - interactive fun for nobreak-fade-add
+;; Version 7 - emacs20 (thing-at-point 'symbol) instead of symbol-at-point
 
 ;;; Code:
 
@@ -70,7 +71,7 @@ SYMBOL-LIST is a list of function symbols.  If REQUIRE-MATCH is
 nil then the return can be any function symbol.  If REQUIRE-MATCH
 is non-nil then it's one of SYMBOL-LIST."
 
-  (let ((default (symbol-at-point))
+  (let ((default (thing-at-point 'symbol))
         (table   (mapcar (lambda (symbol)
                            (let (desc)
                              ;; first line of docstring for
