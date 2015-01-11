@@ -1,9 +1,9 @@
 ;;; nobreak-fade.el --- some functions for `fill-nobreak-predicate'
 
-;; Copyright 2009, 2010, 2011 Kevin Ryde
+;; Copyright 2009, 2010, 2011, 2014 Kevin Ryde
 
 ;; Author: Kevin Ryde <user42@zip.com.au>
-;; Version: 7
+;; Version: 8
 ;; Keywords: convenience, filling
 ;; URL: http://user42.tuxfamily.org/nobreak-fade/index.html
 
@@ -58,6 +58,7 @@
 ;; Version 5 - new nobreak-fade-emacs-info-link-p
 ;; Version 6 - interactive fun for nobreak-fade-add
 ;; Version 7 - emacs20 (thing-at-point 'symbol) instead of symbol-at-point
+;; Version 8 - new nobreak-fade-tex-math-start-p, nobreak-fade-tex-math-end-p
 
 ;;; Code:
 
@@ -229,6 +230,9 @@ of any first or last word, not just single letter ones."
          (and (looking-at (concat letter-and-punct "[ \t]*"))
               (equal pos (match-end 0))))))))
 
+;;-----------------------------------------------------------------------------
+;; Emacs bits
+
 ;;;###autoload
 (defun nobreak-fade-emacs-M-x-p ()
   "Don't break after an Emacs M-x.
@@ -334,7 +338,168 @@ harm if enabled globally."
 ;;;###autoload
 (custom-add-option 'fill-nobreak-predicate 'nobreak-fade-emacs-info-link-p)
 
-;; LocalWords: nobreak docstring docstrings Ret
+;;-----------------------------------------------------------------------------
+;; TeX maths $x ... y$
+
+(defun nobreak-fade-tex-math-start-p ()
+  "Don't break after the first symbol of a TeX math $foo ...$.
+This function is designed for use in `fill-nobreak-predicate'.
+
+A break is suppressed just after a short word or symbol at the
+start of a TeX math form.  For example
+
+    $a \\=\\ge b$
+      ^---- no break here
+
+This helps to source readability by keeping a short initial
+symbol together with the rest of the expression.
+
+A word or symbol of 5 or fewer chars gives a no-break.  5 has the
+advantage of keeping a \\=\\bigl opening together with the
+following expression, as for example
+
+    $\\=\\bigl( \\=\\begin{smallmatrix} ... $
+           ^---- no break here
+
+Perhaps exactly how many characters etc will change.  The
+intention is no break after a small initial symbol or number.
+
+An opening $ is distinguished from a closing $ by having
+preceding whitespace or start of line.
+
+$$ and LaTeX \\=\\[ display math are treated the same as $,
+though they're usually at the start of a line anyway.
+
+    \\=\\[123 \\=\\times 456\\=\\]
+         ^---- no break here
+
+A literal $ in math mode can be escaped as \\=\\$ and this is
+recognised as not a closing $ and so can be part of a no-break,
+
+    $\\=\\$10 \\=\\times N$
+         ^---- no break here, literal $
+
+This predicate is TeX-specific.  In particular it would be
+undesirable in plain text where $123 would be a monetary amount,
+or in Perl where \"$x\" is a variable.  Both would happily have a
+following line break.
+
+For this reason `nobreak-fade-tex-math-start-p' will normally
+be added buffer-local to `fill-nobreak-predicate' in `tex-mode'
+or similar.  See `nobreak-fade-tex-math-add' for a convenient
+way to do that.
+
+----
+See `nobreak-fade-tex-math-end-p' for similar on closing $."
+
+  (save-excursion
+    ;; Point is after the whitespace between words, so for example
+    ;;    foo bar  quux
+    ;;             ^----point here at q
+    ;; Go to start of preceding word, where word means run of non-white,
+    ;; not word syntax as such since the "$" etc which are of interest are
+    ;; not word chars.  Also \n is endcomment syntax rather than
+    ;; whitespace, so cannot use `skip-syntax-backward' for the non-white
+    ;; as it would go back past the current line.
+    ;;
+    (skip-chars-backward " \t")
+    (let ((after (point)))
+      (skip-chars-backward "^ \t\r\n")
+
+      ;; $ or $$ or \( begins math mode.
+      ;; Further $ or \) ends, except \$ is a literal $ and so does not end.
+      ;; So match \ followed by non-) non-white, otherwise any non-$ non-white.
+      ;;
+      ;; Mixtures "\( $" or "$ \)" work and are handled here, though
+      ;; actually using that would be confusing.
+      ;;
+      ;; \[ is ended by \] and not by $ or $$.
+      ;; Usually \[, or $$ for that matter, would start at the start of a
+      ;; line anyway so would not arise here.
+      ;;
+      (and (looking-at "\
+\\(\
+\\(\\$\\$?\\|\\\\(\\)\\(\\\\[^) \t]\\|[^\\$ \t]\\)\\{1,5\\}\
+\\|\
+\\\\\\[\\(\\\\[^] \t]\\|[^\\ \t]\\)\\{1,5\\}\
+\\)")
+           (= (match-end 0) after)))))
+
+(defun nobreak-fade-tex-math-end-p ()
+  "Don't break before the last symbol of a TeX math $... foo$.
+This function is designed for use in `fill-nobreak-predicate'.
+
+A break is suppressed just before the last symbol etc of a TeX
+math form.  For example
+
+    $a \\=\\ge b$
+          ^---- no break here
+
+This helps to source readability by keeping a short final symbol
+together with the rest of the expression.
+
+A word or symbol of 5 or fewer chars gives a no-break.  5 has the
+advantage of keeping a \\=\\bigr closing together with the
+following expression, as for example
+
+    $ ... \\=\\end{smallmatrix} \\=\\bigl)$
+                           ^---- no break here
+
+Perhaps exactly how many characters etc will change.  The
+intention is no break before a small final symbol or number.
+
+$$ and LaTeX \\=\\[ display math are treated the same as $,
+though they're usually at the start of a line anyway.
+
+    \\=\\[123 \\=\\times 456\\=\\]
+                ^---- no break here
+
+A literal $ in math mode can be escaped as \\=\\$ and this is
+recognised as not a closing $ and so does not cause a no-break,
+
+    $a + 10\\=\\$ + b + c + d$
+             ^---- break allowed here, literal $
+
+This predicate is TeX-specific and for this reason will normally
+be added buffer-local to `fill-nobreak-predicate' in `tex-mode'
+or similar.  See `nobreak-fade-tex-math-add' for a convenient
+way to do that.
+
+----
+See `nobreak-fade-tex-math-start-p' for similar on closing $."
+
+  (looking-at "\
+\\([^ \t$\\]\\|\\\\.\\)\\{1,5\\}\
+\\(\\$\\$?\\|\\\\[])]\\)\
+\\([ \t]\\|$\\)"))
+
+;;;###autoload
+(defun nobreak-fade-tex-math-add ()
+  "Add Tex math nobreak predicates to `fill-nobreak-predicate'.
+This function is designed for use in `tex-mode-hook' or similar.
+
+`nobreak-fade-tex-math-start-p' and
+`nobreak-fade-tex-math-end-p' are added to
+`fill-nobreak-predicate', but only buffer-local since these
+predicates are TeX-specific.
+
+This function is interactive so \\[nobreak-fade-tex-math-add]
+can add the predicates to try temporarily before putting them in
+a hook, or perhaps if editing TeX in the middle of some other
+mode."
+
+  (interactive)
+  (nobreak-fade-add 'nobreak-fade-tex-math-start-p
+                     t)  ;; buffer-local
+  (nobreak-fade-add 'nobreak-fade-tex-math-end-p
+                     t)) ;; buffer-local
+
+;;;###autoload
+(custom-add-option 'tex-mode-hook 'nobreak-fade-tex-math-add)
+
+;;-----------------------------------------------------------------------------
+
+;; LocalWords: nobreak docstring docstrings Ret minibuffer foo bigl bigr ge
 
 (provide 'nobreak-fade)
 
