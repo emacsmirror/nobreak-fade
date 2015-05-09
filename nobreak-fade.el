@@ -1,9 +1,9 @@
 ;;; nobreak-fade.el --- some functions for `fill-nobreak-predicate'
 
-;; Copyright 2009, 2010, 2011, 2014 Kevin Ryde
+;; Copyright 2009, 2010, 2011, 2014, 2015 Kevin Ryde
 
-;; Author: Kevin Ryde <user42@zip.com.au>
-;; Version: 8
+;; Author: Kevin Ryde <user42_kevin@yahoo.com.au>
+;; Version: 9
 ;; Keywords: convenience, filling
 ;; URL: http://user42.tuxfamily.org/nobreak-fade/index.html
 
@@ -28,7 +28,7 @@
 ;;; Emacsen:
 
 ;; Designed for Emacs 20 and up.  Does nothing in XEmacs 21 as it doesn't
-;; have a nobreak.
+;; have nobreak.
 
 ;;; Install:
 
@@ -44,9 +44,9 @@
 ;;     (require 'nobreak-fade)
 ;;     (nobreak-fade-add 'nobreak-fade-single-letter-p)
 ;;
-;; There's autoload cookies for the functions if you know how to use
-;; `update-file-autoloads' and friends, after which just add-hook or
-;; customize.
+;; There's autoload cookies for the functions if you install via
+;; `M-x package-install' or know how to use `update-file-autoloads'.
+;; After that just add-hook or customize.
 
 ;;; History:
 
@@ -59,6 +59,7 @@
 ;; Version 6 - interactive fun for nobreak-fade-add
 ;; Version 7 - emacs20 (thing-at-point 'symbol) instead of symbol-at-point
 ;; Version 8 - new nobreak-fade-tex-math-start-p, nobreak-fade-tex-math-end-p
+;; Version 9 - new email
 
 ;;; Code:
 
@@ -296,8 +297,8 @@ It keeps the node name part of an info link on one line,
                                        ^
                          no break here |
 
-Prior to Emacs 23.2 if there's a newline within the node name
-then pressing Ret to follow it only takes the name up to the
+In Emacs 23.1 and earlier if there's a newline within the node
+name then pressing Ret to follow it only takes the name up to the
 newline.  This is fixed in Emacs 23.2 but avoiding a newline
 helps earlier versions.
 
@@ -316,7 +317,7 @@ harm if enabled globally."
   ;;
   ;; xemacs21 doesn't have help-xref-info-regexp (and there's no
   ;; help-mode.el), so will get an error, but don't worry about that as
-  ;; there's no fill-nobreak-predicate at all
+  ;; there's no fill-nobreak-predicate there at all.
   ;;
   (unless (boundp 'help-xref-info-regexp)
     (require 'help-mode))
@@ -342,17 +343,17 @@ harm if enabled globally."
 ;; TeX maths $x ... y$
 
 (defun nobreak-fade-tex-math-start-p ()
-  "Don't break after the first symbol of a TeX math $foo ...$.
+  "Don't break after the first symbol of a TeX maths $foo ...$.
 This function is designed for use in `fill-nobreak-predicate'.
 
-A break is suppressed just after a short word or symbol at the
-start of a TeX math form.  For example
+A break is suppressed after a short word or symbol at the start
+of a TeX maths form.  For example
 
     $a \\=\\ge b$
       ^---- no break here
 
-This helps to source readability by keeping a short initial
-symbol together with the rest of the expression.
+This helps source readability by keeping a short initial symbol
+together with the rest of the expression.
 
 A word or symbol of 5 or fewer chars gives a no-break.  5 has the
 advantage of keeping a \\=\\bigl opening together with the
@@ -367,7 +368,7 @@ intention is no break after a small initial symbol or number.
 An opening $ is distinguished from a closing $ by having
 preceding whitespace or start of line.
 
-$$ and LaTeX \\=\\[ display math are treated the same as $,
+$$ and LaTeX \\=\\[ display maths are treated the same as $,
 though they're usually at the start of a line anyway.
 
     \\=\\[123 \\=\\times 456\\=\\]
@@ -426,16 +427,16 @@ See `nobreak-fade-tex-math-end-p' for similar on closing $."
            (= (match-end 0) after)))))
 
 (defun nobreak-fade-tex-math-end-p ()
-  "Don't break before the last symbol of a TeX math $... foo$.
+  "Don't break before the last symbol of a TeX maths $... foo$.
 This function is designed for use in `fill-nobreak-predicate'.
 
 A break is suppressed just before the last symbol etc of a TeX
-math form.  For example
+maths form.  For example
 
     $a \\=\\ge b$
           ^---- no break here
 
-This helps to source readability by keeping a short final symbol
+This helps source readability by keeping a short final symbol
 together with the rest of the expression.
 
 A word or symbol of 5 or fewer chars gives a no-break.  5 has the
@@ -448,7 +449,7 @@ following expression, as for example
 Perhaps exactly how many characters etc will change.  The
 intention is no break before a small final symbol or number.
 
-$$ and LaTeX \\=\\[ display math are treated the same as $,
+$$ and LaTeX \\=\\[ display maths are treated the same as $,
 though they're usually at the start of a line anyway.
 
     \\=\\[123 \\=\\times 456\\=\\]
@@ -475,7 +476,7 @@ See `nobreak-fade-tex-math-start-p' for similar on closing $."
 
 ;;;###autoload
 (defun nobreak-fade-tex-math-add ()
-  "Add Tex math nobreak predicates to `fill-nobreak-predicate'.
+  "Add Tex maths nobreak predicates to `fill-nobreak-predicate'.
 This function is designed for use in `tex-mode-hook' or similar.
 
 `nobreak-fade-tex-math-start-p' and
@@ -483,10 +484,9 @@ This function is designed for use in `tex-mode-hook' or similar.
 `fill-nobreak-predicate', but only buffer-local since these
 predicates are TeX-specific.
 
-This function is interactive so \\[nobreak-fade-tex-math-add]
-can add the predicates to try temporarily before putting them in
-a hook, or perhaps if editing TeX in the middle of some other
-mode."
+This function is interactive so `\\[nobreak-fade-tex-math-add]'
+can add the predicates to try temporarily before setting a hook,
+or perhaps if editing TeX in the middle of some other mode."
 
   (interactive)
   (nobreak-fade-add 'nobreak-fade-tex-math-start-p
